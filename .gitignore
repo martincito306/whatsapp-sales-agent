@@ -1,0 +1,19 @@
+# Variables de entorno y secretos
+.env
+.env.local
+.env.*.local
+
+# Dependencias
+node_modules/
+
+# Archivos multimedia privados (comprobantes de pago)
+backend/uploads/
+uploads/
+
+# Logs del sistema
+*.log
+npm-debug.log*
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db

@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NovaCloud Digital — AI Sales Agent & Order Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              purple: '#8B5CF6',
+              neon: '#06B6D4',
+              dark: '#0F172A',
+              card: '#1E293B',
+              border: '#334155'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #0B0F19; color: #F8FAFC; font-family: system-ui, -apple-system, sans-serif; }
+    .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .badge-pending { background: rgba(234, 179, 8, 0.2); color: #FACC15; border: 1px solid rgba(234, 179, 8, 0.4); }
+    .badge-approved { background: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .badge-delivered { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.4); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- PANTALLA DE LOGIN OBLIGATORIA (BLOQUEA ACCESO SIN CREDENCIALES) -->
+  <div id="loginOverlay" class="fixed inset-0 bg-[#0B0F19] z-[100] flex items-center justify-center p-4">
+    <div class="glass max-w-md w-full rounded-3xl p-8 border border-brand-border space-y-6">
+      <div class="flex items-center space-x-3">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-cyan-400 flex items-center justify-center font-black text-xl shadow-lg">
+          NC
+        </div>
+        <div>
+          <h2 class="font-extrabold text-xl text-slate-100">Acceso Administrativo</h2>
+          <p class="text-xs text-slate-400">WhatsApp AI Sales Agent &middot; Consola Protegida</p>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <label class="text-xs font-semibold text-slate-300 block">Clave de Administrador (ADMIN_KEY)</label>
+        <input type="password" id="adminKeyInput" placeholder="Ingresa tu ADMIN_KEY..." class="w-full bg-slate-900 border border-brand-border rounded-xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-purple-500">
+        <p id="loginErrorMsg" class="text-xs text-rose-400 hidden">Clave inválida o no autorizada por el servidor.</p>
+      </div>
+
+      <button onclick="attemptLogin()" class="w-full py-3 bg-gradient-to-r from-purple-600 to-cyan-500 hover:opacity-95 text-white font-bold rounded-xl text-sm transition">
+        Iniciar Sesión Segura
+      </button>
+    </div>
+  </div>
+
+  <!-- TOP HEADER -->
+  <header class="glass sticky top-0 z-50 px-6 py-4 flex flex-wrap items-center justify-between border-b border-brand-border">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-cyan-400 flex items-center justify-center font-black text-xl shadow-lg">
+        NC
+      </div>
+      <div>
+        <h1 class="font-extrabold text-xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-300">
+          NOVACLOUD DIGITAL
+        </h1>
+        <p class="text-xs text-slate-400">WhatsApp Cloud API &middot; Gemini AI Sales Engine</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-3 mt-2 sm:mt-0">
+      <div class="flex items-center bg-slate-900 px-4 py-2 rounded-xl border border-brand-border">
+        <span class="text-xs font-semibold mr-3 text-slate-300">ESTADO DEL BOT:</span>
+        <button id="toggleBotBtn" onclick="toggleGlobalBot()" class="px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="botStatusText">ACTIVO 24/7</span>
+        </button>
+      </div>
+
+      <button onclick="refreshData()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Actualizar datos">
+        <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+      </button>
+      <button onclick="logoutAdmin()" class="p-2 rounded-xl bg-rose-900/40 hover:bg-rose-800/60 text-rose-300 transition" title="Cerrar sesión">
+        <i data-lucide="log-out" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- NAVIGATION TABS -->
+  <nav class="bg-slate-900/60 px-6 py-2 border-b border-brand-border flex space-x-2 overflow-x-auto text-sm">
+    <button onclick="switchTab('dashboard')" class="tab-btn px-4 py-2 rounded-lg font-medium transition bg-purple-600/20 text-purple-300 border border-purple-500/30 flex items-center space-x-2" data-tab="dashboard">
+      <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+      <span>Dashboard</span>
+    </button>
+    <button onclick="switchTab('orders')" class="tab-btn px-4 py-2 rounded-lg font-medium transition text-slate-400 hover:text-slate-200 flex items-center space-x-2" data-tab="orders">
+      <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+      <span>Pedidos & Pagos</span>
+      <span id="pendingOrdersBadge" class="hidden px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/30 text-amber-300">0</span>
+    </button>
+    <button onclick="switchTab('catalog')" class="tab-btn px-4 py-2 rounded-lg font-medium transition text-slate-400 hover:text-slate-200 flex items-center space-x-2" data-tab="catalog">
+      <i data-lucide="layers" class="w-4 h-4"></i>
+      <span>Catálogo & Precios</span>
+    </button>
+    <button onclick="switchTab('customers')" class="tab-btn px-4 py-2 rounded-lg font-medium transition text-slate-400 hover:text-slate-200 flex items-center space-x-2" data-tab="customers">
+      <i data-lucide="users" class="w-4 h-4"></i>
+      <span>Clientes & Hand-off</span>
+    </button>
+    <button onclick="switchTab('settings')" class="tab-btn px-4 py-2 rounded-lg font-medium transition text-slate-400 hover:text-slate-200 flex items-center space-x-2" data-tab="settings">
+      <i data-lucide="settings" class="w-4 h-4"></i>
+      <span>Configuración</span>
+    </button>
+  </nav>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
+
+    <!-- 1. TAB: DASHBOARD -->
+    <div id="tab-dashboard" class="tab-content space-y-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="glass p-5 rounded-2xl border border-brand-border">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-xs uppercase font-bold tracking-wider text-slate-400">Ventas Confirmadas</p>
+              <h3 id="statSalesToday" class="text-2xl font-black mt-1 text-emerald-400">$0</h3>
+            </div>
+            <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-400">
+              <i data-lucide="dollar-sign" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-3">Órdenes aprobadas y entregadas</p>
+        </div>
+
+        <div class="glass p-5 rounded-2xl border border-brand-border">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-xs uppercase font-bold tracking-wider text-slate-400">Pagos por Verificar</p>
+              <h3 id="statPendingPayments" class="text-2xl font-black mt-1 text-amber-400">0</h3>
+            </div>
+            <div class="p-3 bg-amber-500/10 rounded-xl text-amber-400">
+              <i data-lucide="alert-circle" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-3">Comprobantes privados por validar</p>
+        </div>
+
+        <div class="glass p-5 rounded-2xl border border-brand-border">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-xs uppercase font-bold tracking-wider text-slate-400">Pedidos Totales</p>
+              <h3 id="statTotalOrders" class="text-2xl font-black mt-1 text-cyan-400">0</h3>
+            </div>
+            <div class="p-3 bg-cyan-500/10 rounded-xl text-cyan-400">
+              <i data-lucide="package" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-3">Registrados en PostgreSQL</p>
+        </div>
+
+        <div class="glass p-5 rounded-2xl border border-brand-border">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-xs uppercase font-bold tracking-wider text-slate-400">Clientes Totales</p>
+              <h3 id="statTotalCustomers" class="text-2xl font-black mt-1 text-purple-400">0</h3>
+            </div>
+            <div class="p-3 bg-purple-500/10 rounded-xl text-purple-400">
+              <i data-lucide="users" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-3">En el embudo conversacional</p>
+        </div>
+      </div>
+
+      <div class="glass rounded-2xl p-6 border border-brand-border">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <span class="w-3 h-3 rounded-full bg-amber-400 animate-ping"></span>
+            <h2 class="text-lg font-bold text-slate-100">🚨 Comprobantes Pendientes de Verificación</h2>
+          </div>
+          <span class="text-xs text-slate-400">Validación manual obligatoria</span>
+        </div>
+
+        <div id="urgentPaymentsList" class="space-y-3">
+          <p class="text-sm text-slate-400 py-4 text-center">No hay comprobantes pendientes por verificar.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. TAB: PEDIDOS -->
+    <div id="tab-orders" class="tab-content hidden space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold text-slate-100">Gestión de Pedidos</h2>
+        <select id="orderStatusFilter" onchange="renderOrders()" class="bg-slate-800 text-xs text-slate-200 border border-brand-border rounded-lg px-3 py-2">
+          <option value="ALL">Todos los Estados</option>
+          <option value="COMPROBANTE_RECIBIDO">🟡 Comprobante Recibido</option>
+          <option value="PENDIENTE_PAGO">⏳ Pendiente de Pago</option>
+          <option value="ENTREGADO">✅ Entregado</option>
+        </select>
+      </div>
+
+      <div class="glass rounded-2xl overflow-hidden border border-brand-border">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-slate-900/80 text-xs uppercase font-bold text-slate-400 border-b border-brand-border">
+              <tr>
+                <th class="p-4">Pedido</th>
+                <th class="p-4">Cliente</th>
+                <th class="p-4">Servicio / Paquete</th>
+                <th class="p-4">Total</th>
+                <th class="p-4">Estado</th>
+                <th class="p-4">Comprobante Privado</th>
+                <th class="p-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody" class="divide-y divide-brand-border/40"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. TAB: CATÁLOGO -->
+    <div id="tab-catalog" class="tab-content hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-slate-100">Catálogo de Servicios y Paquetes</h2>
+        <p class="text-xs text-slate-400">Fuente de verdad única para el motor de ventas y el contexto de Gemini</p>
+      </div>
+
+      <div class="glass rounded-2xl p-5 border border-brand-border space-y-4">
+        <h3 class="font-bold text-md text-purple-300">Servicios Individuales</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-slate-900/60 text-xs uppercase text-slate-400">
+              <tr>
+                <th class="p-3">Nombre</th>
+                <th class="p-3">Categoría</th>
+                <th class="p-3">Ciclo</th>
+                <th class="p-3">Precio</th>
+                <th class="p-3">Estado</th>
+                <th class="p-3 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="productsTableBody" class="divide-y divide-brand-border/40"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="glass rounded-2xl p-5 border border-brand-border space-y-4">
+        <h3 class="font-bold text-md text-cyan-300">Paquetes / Combos Empresariales</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-slate-900/60 text-xs uppercase text-slate-400">
+              <tr>
+                <th class="p-3">#</th>
+                <th class="p-3">Paquete</th>
+                <th class="p-3">Precio</th>
+                <th class="p-3">Estado</th>
+                <th class="p-3 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="combosTableBody" class="divide-y divide-brand-border/40"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. TAB: CLIENTES -->
+    <div id="tab-customers" class="tab-content hidden space-y-4">
+      <h2 class="text-xl font-bold text-slate-100">Clientes & Control de Hand-off Humano</h2>
+      <div class="glass rounded-2xl overflow-hidden border border-brand-border">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-slate-900/80 text-xs uppercase font-bold text-slate-400 border-b border-brand-border">
+              <tr>
+                <th class="p-4">Cliente</th>
+                <th class="p-4">WhatsApp</th>
+                <th class="p-4">Estado Embudo</th>
+                <th class="p-4">Modo de Atención</th>
+                <th class="p-4 text-right">Control</th>
+              </tr>
+            </thead>
+            <tbody id="customersTableBody" class="divide-y divide-brand-border/40"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. TAB: CONFIGURACIÓN -->
+    <div id="tab-settings" class="tab-content hidden space-y-6">
+      <h2 class="text-xl font-bold text-slate-100">Configuración del Sistema</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="glass rounded-2xl p-6 border border-brand-border space-y-4">
+          <h3 class="font-bold text-md text-slate-200">Cuenta Receptora de Pagos</h3>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Número de Cuenta / Nequi</label>
+            <input type="text" id="nequiAccountInput" placeholder="Ej: 3000000000" class="w-full bg-slate-900 border border-brand-border rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-purple-500">
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Nombre del Titular</label>
+            <input type="text" id="nequiNameInput" placeholder="Ej: NovaCloud SAS" class="w-full bg-slate-900 border border-brand-border rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-purple-500">
+          </div>
+          <button onclick="savePaymentSettings()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-bold transition">Guardar Configuración</button>
+        </div>
+
+        <div class="glass rounded-2xl p-6 border border-brand-border space-y-4">
+          <h3 class="font-bold text-md text-slate-200">Política de Seguridad y Entregas</h3>
+          <div class="flex items-center justify-between p-4 bg-slate-900/60 rounded-xl border border-brand-border">
+            <div>
+              <p class="text-sm font-semibold text-slate-200">Verificación Humana de Pagos</p>
+              <p class="text-xs text-slate-400">La IA tiene prohibido confirmar pagos por sí sola</p>
+            </div>
+            <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">PROTECCIÓN ACTIVA</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL: VER COMPROBANTE PRIVADO & APROBAR -->
+  <div id="receiptModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="glass max-w-lg w-full rounded-3xl p-6 border border-brand-border space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-slate-100" id="modalOrderTitle">Verificar Pedido</h3>
+        <button onclick="closeReceiptModal()" class="text-slate-400 hover:text-slate-200"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="space-y-3">
+        <div class="rounded-xl overflow-hidden bg-slate-900 border border-brand-border max-h-64 min-h-[120px] flex items-center justify-center">
+          <img id="modalReceiptImg" src="" alt="Comprobante privado" class="max-h-64 object-contain">
+        </div>
+
+        <div class="p-3 bg-slate-900/80 rounded-xl border border-brand-border text-xs space-y-1">
+          <p><span class="text-slate-400">Cliente:</span> <strong id="modalCustomerName" class="text-slate-200"></strong> (<span id="modalCustomerPhone"></span>)</p>
+          <p><span class="text-slate-400">Servicio:</span> <strong id="modalProductName" class="text-purple-300"></strong></p>
+          <p><span class="text-slate-400">Total a verificar:</span> <strong id="modalTotal" class="text-emerald-400 font-bold"></strong></p>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-300 font-semibold block mb-1">Licencia / Credenciales de entrega:</label>
+          <textarea id="modalDeliveryNotes" rows="2" placeholder="Ej: Licencia: NC-2026-PRO-9981 | Acceso: https://panel.novacloud.io" class="w-full bg-slate-900 border border-brand-border rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-purple-500"></textarea>
+        </div>
+
+        <div class="flex space-x-2 pt-2">
+          <button onclick="submitApproveOrder()" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition flex items-center justify-center space-x-1.5">
+            <span>✅ APROBAR Y ENTREGAR</span>
+          </button>
+          <button onclick="submitRejectOrder()" class="px-4 py-2.5 bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white font-bold rounded-xl text-xs transition border border-rose-500/30">
+            ❌ Rechazar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let globalData = { orders: [], products: [], combos: [], customers: [], settings: {} };
+    let currentModalOrderId = null;
+
+    function getAdminKey() {
+      return sessionStorage.getItem('ADMIN_KEY') || '';
+    }
+
+    async function apiFetch(url, options = {}) {
+      const headers = {
+        ...(options.headers || {}),
+        'x-admin-key': getAdminKey()
+      };
+      if (options.body && !(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+      }
+      const res = await fetch(url, { ...options, headers });
+      if (res.status === 401 || res.status === 503) {
+        document.getElementById('loginOverlay').classList.remove('hidden');
+        throw new Error('No autorizado');
+      }
+      return res;
+    }
+
+    async function attemptLogin() {
+      const key = document.getElementById('adminKeyInput').value.trim();
+      if (!key) return;
+      sessionStorage.setItem('ADMIN_KEY', key);
+      try {
+        const res = await apiFetch('/api/settings');
+        if (res.ok) {
+          document.getElementById('loginOverlay').classList.add('hidden');
+          document.getElementById('loginErrorMsg').classList.add('hidden');
+          fetchDashboardData();
+        }
+      } catch (err) {
+        sessionStorage.removeItem('ADMIN_KEY');
+        document.getElementById('loginErrorMsg').classList.remove('hidden');
+      }
+    }
+
+    function logoutAdmin() {
+      sessionStorage.removeItem('ADMIN_KEY');
+      document.getElementById('loginOverlay').classList.remove('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      if (getAdminKey()) {
+        fetchDashboardData();
+      }
+      setInterval(() => {
+        if (getAdminKey()) fetchDashboardData();
+      }, 15000);
+    });
+
+    function formatCOP(num) {
+      return '$' + Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    async function fetchDashboardData() {
+      try {
+        const [ordersRes, prodRes, combosRes, custRes, settingsRes] = await Promise.all([
+          apiFetch('/api/orders').then(r => r.json()),
+          apiFetch('/api/products').then(r => r.json()),
+          apiFetch('/api/combos').then(r => r.json()),
+          apiFetch('/api/customers').then(r => r.json()),
+          apiFetch('/api/settings').then(r => r.json())
+        ]);
+
+        document.getElementById('loginOverlay').classList.add('hidden');
+
+        globalData.orders = ordersRes.data || [];
+        globalData.products = prodRes.data || [];
+        globalData.combos = combosRes.data || [];
+        globalData.customers = custRes.data || [];
+        globalData.settings = settingsRes.data || {};
+
+        if (globalData.settings.payment_methods?.nequi) {
+          document.getElementById('nequiAccountInput').value = globalData.settings.payment_methods.nequi.account || '';
+          document.getElementById('nequiNameInput').value = globalData.settings.payment_methods.nequi.name || '';
+        }
+
+        renderKPIs();
+        renderUrgentPayments();
+        renderOrders();
+        renderCatalog();
+        renderCustomers();
+        updateBotStatusUI();
+      } catch (err) {
+        console.warn('Sesión administrativa requerida.');
+      }
+    }
+
+    function renderKPIs() {
+      const todaySales = globalData.orders
+        .filter(o => o.status === 'ENTREGADO' || o.status === 'PAGO_APROBADO')
+        .reduce((sum, o) => sum + Number(o.total_price), 0);
+
+      document.getElementById('statSalesToday').innerText = formatCOP(todaySales);
+
+      const pendingPayments = globalData.orders.filter(o => o.status === 'COMPROBANTE_RECIBIDO').length;
+      document.getElementById('statPendingPayments').innerText = pendingPayments;
+
+      const badge = document.getElementById('pendingOrdersBadge');
+      if (pendingPayments > 0) {
+        badge.innerText = pendingPayments;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+
+      document.getElementById('statTotalOrders').innerText = globalData.orders.length;
+      document.getElementById('statTotalCustomers').innerText = globalData.customers.length;
+    }
+
+    function renderUrgentPayments() {
+      const container = document.getElementById('urgentPaymentsList');
+      const urgentOrders = globalData.orders.filter(o => o.status === 'COMPROBANTE_RECIBIDO');
+
+      if (urgentOrders.length === 0) {
+        container.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">No hay comprobantes pendientes por verificar.</p>';
+        return;
+      }
+
+      container.innerHTML = urgentOrders.map(o => `
+        <div class="flex flex-wrap items-center justify-between p-4 bg-slate-900/90 rounded-xl border border-amber-500/30">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-slate-100">${o.customer_name || 'Cliente'}</span>
+              <span class="text-xs text-slate-400">+${o.phone_number}</span>
+              <span class="badge-pending px-2 py-0.5 rounded-full text-xs font-bold">${o.order_code}</span>
+            </div>
+            <p class="text-xs text-purple-300 mt-1">${o.product_name} &middot; <strong class="text-emerald-400">${formatCOP(o.total_price)}</strong></p>
+          </div>
+          <div class="flex space-x-2 mt-2 sm:mt-0">
+            <button onclick="openReceiptModal('${o.id}')" class="px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white rounded-lg text-xs font-semibold transition border border-purple-500/30">
+              Ver Comprobante Privado & Aprobar
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderOrders() {
+      const tbody = document.getElementById('ordersTableBody');
+      const filter = document.getElementById('orderStatusFilter').value;
+      const filtered = filter === 'ALL' ? globalData.orders : globalData.orders.filter(o => o.status === filter);
+
+      tbody.innerHTML = filtered.map(o => `
+        <tr class="hover:bg-slate-800/40 transition">
+          <td class="p-4 font-mono font-bold text-xs text-cyan-300">${o.order_code}</td>
+          <td class="p-4">
+            <div class="font-semibold text-slate-200">${o.customer_name || 'Cliente'}</div>
+            <div class="text-xs text-slate-400">+${o.phone_number}</div>
+          </td>
+          <td class="p-4 text-slate-200">${o.product_name}</td>
+          <td class="p-4 font-bold text-emerald-400">${formatCOP(o.total_price)}</td>
+          <td class="p-4">
+            <span class="px-2 py-1 rounded-full text-xs font-semibold ${
+              o.status === 'ENTREGADO' ? 'badge-delivered' :
+              o.status === 'COMPROBANTE_RECIBIDO' ? 'badge-pending' : 'bg-slate-800 text-slate-400'
+            }">${o.status}</span>
+          </td>
+          <td class="p-4">
+            ${o.receipt_url ? `
+              <button onclick="openReceiptModal('${o.id}')" class="text-xs text-purple-400 hover:underline flex items-center space-x-1">
+                <span>🔒 Ver comprobante</span>
+              </button>
+            ` : '<span class="text-xs text-slate-500">Sin comprobante</span>'}
+          </td>
+          <td class="p-4 text-right">
+            ${o.status === 'COMPROBANTE_RECIBIDO' ? `
+              <button onclick="openReceiptModal('${o.id}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">
+                Revisar
+              </button>
+            ` : ''}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderCatalog() {
+      const prodBody = document.getElementById('productsTableBody');
+      prodBody.innerHTML = globalData.products.map(p => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="p-3 font-semibold text-slate-200">${p.name}</td>
+          <td class="p-3 text-xs text-slate-400">${p.category}</td>
+          <td class="p-3 text-xs text-slate-400">${p.duration_text}</td>
+          <td class="p-3 font-bold text-emerald-400">${formatCOP(p.price)}</td>
+          <td class="p-3">
+            <button onclick="toggleProductAvailable('${p.id}', ${!p.is_available})" class="px-2.5 py-0.5 rounded-full text-xs font-bold ${
+              p.is_available ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+            }">
+              ${p.is_available ? '🟢 DISPONIBLE' : '🔴 AGOTADO'}
+            </button>
+          </td>
+          <td class="p-3 text-right">
+            <button onclick="editProductPrice('${p.id}', ${p.price})" class="text-xs text-purple-400 hover:underline">Cambiar precio</button>
+          </td>
+        </tr>
+      `).join('');
+
+      const combosBody = document.getElementById('combosTableBody');
+      combosBody.innerHTML = globalData.combos.map(c => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="p-3 font-mono text-cyan-400 font-bold">#${c.combo_number}</td>
+          <td class="p-3 font-semibold text-slate-200">${c.name}</td>
+          <td class="p-3 font-bold text-emerald-400">${formatCOP(c.price)}</td>
+          <td class="p-3">
+            <button onclick="toggleComboAvailable('${c.id}', ${!c.is_available})" class="px-2.5 py-0.5 rounded-full text-xs font-bold ${
+              c.is_available ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+            }">
+              ${c.is_available ? '🟢 DISPONIBLE' : '🔴 AGOTADO'}
+            </button>
+          </td>
+          <td class="p-3 text-right">
+            <button onclick="editComboPrice('${c.id}', ${c.price})" class="text-xs text-purple-400 hover:underline">Cambiar precio</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderCustomers() {
+      const tbody = document.getElementById('customersTableBody');
+      tbody.innerHTML = globalData.customers.map(c => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="p-4 font-semibold text-slate-200">${c.name || 'Sin nombre'}</td>
+          <td class="p-4 text-slate-400 font-mono">+${c.phone_number}</td>
+          <td class="p-4"><span class="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300 border border-slate-700">${c.state}</span></td>
+          <td class="p-4">
+            <span class="text-xs font-bold ${c.bot_active ? 'text-emerald-400' : 'text-amber-400'}">
+              ${c.bot_active ? '🤖 Bot Activo' : '👨‍💻 Atención Humana'}
+            </span>
+          </td>
+          <td class="p-4 text-right">
+            <button onclick="toggleCustomerBot('${c.id}', ${!c.bot_active})" class="px-3 py-1 rounded-lg text-xs font-bold ${
+              c.bot_active ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+            }">
+              ${c.bot_active ? 'Pausar Bot (Hand-off)' : 'Reanudar Bot'}
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById('tab-' + tabId).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-purple-600/20', 'text-purple-300', 'border', 'border-purple-500/30');
+        btn.classList.add('text-slate-400');
+        if (btn.dataset.tab === tabId) {
+          btn.classList.add('bg-purple-600/20', 'text-purple-300', 'border', 'border-purple-500/30');
+          btn.classList.remove('text-slate-400');
+        }
+      });
+    }
+
+    async function openReceiptModal(orderId) {
+      const order = globalData.orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      currentModalOrderId = orderId;
+      document.getElementById('modalOrderTitle').innerText = `Verificar ${order.order_code}`;
+      document.getElementById('modalCustomerName').innerText = order.customer_name || 'Cliente';
+      document.getElementById('modalCustomerPhone').innerText = '+' + order.phone_number;
+      document.getElementById('modalProductName').innerText = order.product_name;
+      document.getElementById('modalTotal').innerText = formatCOP(order.total_price);
+      document.getElementById('modalDeliveryNotes').value = order.delivery_notes || '';
+
+      const imgEl = document.getElementById('modalReceiptImg');
+      imgEl.src = '';
+
+      // Cargar imagen privada mediante fetch autenticado con x-admin-key
+      try {
+        const res = await apiFetch(`/api/orders/${orderId}/receipt-image`);
+        if (res.ok) {
+          const blob = await res.blob();
+          imgEl.src = URL.createObjectURL(blob);
+        }
+      } catch (e) {
+        console.warn('No se pudo cargar vista previa del comprobante.');
+      }
+
+      document.getElementById('receiptModal').classList.remove('hidden');
+    }
+
+    function closeReceiptModal() {
+      document.getElementById('receiptModal').classList.add('hidden');
+      currentModalOrderId = null;
+    }
+
+    async function submitApproveOrder() {
+      if (!currentModalOrderId) return;
+      const notes = document.getElementById('modalDeliveryNotes').value.trim();
+
+      await apiFetch(`/api/orders/${currentModalOrderId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'ENTREGADO', delivery_notes: notes })
+      });
+      closeReceiptModal();
+      fetchDashboardData();
+    }
+
+    async function submitRejectOrder() {
+      if (!currentModalOrderId) return;
+      if (!confirm('¿Seguro que deseas rechazar este comprobante?')) return;
+      await apiFetch(`/api/orders/${currentModalOrderId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'PAGO_RECHAZADO' })
+      });
+      closeReceiptModal();
+      fetchDashboardData();
+    }
+
+    async function toggleProductAvailable(id, isAvailable) {
+      await apiFetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_available: isAvailable })
+      });
+      fetchDashboardData();
+    }
+
+    async function editProductPrice(id, currentPrice) {
+      const newPrice = prompt('Ingresa el nuevo precio en COP:', currentPrice);
+      if (newPrice && !isNaN(newPrice)) {
+        await apiFetch(`/api/products/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ price: parseFloat(newPrice) })
+        });
+        fetchDashboardData();
+      }
+    }
+
+    async function toggleComboAvailable(id, isAvailable) {
+      await apiFetch(`/api/combos/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_available: isAvailable })
+      });
+      fetchDashboardData();
+    }
+
+    async function editComboPrice(id, currentPrice) {
+      const newPrice = prompt('Ingresa el nuevo precio en COP:', currentPrice);
+      if (newPrice && !isNaN(newPrice)) {
+        await apiFetch(`/api/combos/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ price: parseFloat(newPrice) })
+        });
+        fetchDashboardData();
+      }
+    }
+
+    async function toggleCustomerBot(customerId, newBotActive) {
+      await apiFetch(`/api/customers/${customerId}/bot`, {
+        method: 'PATCH',
+        body: JSON.stringify({ bot_active: newBotActive })
+      });
+      fetchDashboardData();
+    }
+
+    async function savePaymentSettings() {
+      const account = document.getElementById('nequiAccountInput').value.trim();
+      const name = document.getElementById('nequiNameInput').value.trim();
+      const updatedMethods = {
+        ...(globalData.settings.payment_methods || {}),
+        nequi: { account, name, active: true }
+      };
+      await apiFetch('/api/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ payment_methods: updatedMethods })
+      });
+      fetchDashboardData();
+      alert('✅ Configuración de pagos actualizada correctamente.');
+    }
+
+    function updateBotStatusUI() {
+      const isBotActive = globalData.settings.bot_active === true || globalData.settings.bot_active === 'true';
+      const btn = document.getElementById('toggleBotBtn');
+      const text = document.getElementById('botStatusText');
+
+      if (isBotActive) {
+        btn.className = "px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+        text.innerText = "ACTIVO 24/7";
+      } else {
+        btn.className = "px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 bg-rose-500/20 text-rose-400 border border-rose-500/40";
+        text.innerText = "PAUSADO (EMERGENCIA)";
+      }
+    }
+
+    async function toggleGlobalBot() {
+      const isBotActive = globalData.settings.bot_active === true || globalData.settings.bot_active === 'true';
+      const newState = !isBotActive;
+      await apiFetch('/api/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ bot_active: newState })
+      });
+      globalData.settings.bot_active = newState;
+      updateBotStatusUI();
+    }
+
+    function refreshData() {
+      fetchDashboardData();
+    }
+  </script>
+</body>
+</html>
